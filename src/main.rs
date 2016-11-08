@@ -83,7 +83,7 @@ fn main() {
         return;
     }
 
-    let root_dir = env::home_dir().map(|p| p.join(DOT_FILE_DIR));
+    let root_dir = env::home_dir();
     if !root_dir.is_some() {
         panic!("dotfile couldn't find your home directory. \
             This probably means that $HOME was not set.");
