@@ -1,0 +1,13 @@
+[package]
+name = "dotfile-cli"
+version = "0.1.0"
+authors = ["towry <tovvry@gmail.com>"]
+
+[[bin]]
+name = "dotfile"
+
+[dependencies]
+getopts = "0.2"
+
+[features]
+debug = []
