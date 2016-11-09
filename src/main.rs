@@ -34,23 +34,34 @@ impl<'a> Config<'a> {
             panic!("mapping file not parsed");
         }
 
+        match self.mapping {
+            Some(map) => {
+                let val = map.get(key);
+                if val.is_ok() {
+                    return true;
+                }
+                return false;
+            },
+            None => {
+                return false
+            }
+        }
+
         false
     }
 
-    fn mapping_init(&self, file: &String) -> Result<(), (io::Error)> {
+    fn mapping_init(&mut self, file: &String) -> Result<(), (io::Error)> {
         let mut buffer = String::new();
         let mut f = try!(fs::File::open(file));
 
         try!(f.read_to_string(&mut buffer));
 
         let obj = json::parse(&*buffer);
-        match obj {
-           Ok(val) => {
-                println!("{}", val["name"]);
-            },
-            Err(err) => {
-                panic!(err);
-            },
+        if obj.is_ok() {
+            self.mapping = obj.ok();
+        } else {
+            self.mapping = Some(json::JsonValue::new_object());
+            return Err(io::Error::new(io::ErrorKind::Other, "error"));
         }
 
         Ok(())
