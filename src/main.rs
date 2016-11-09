@@ -10,7 +10,8 @@ use std::fs;
 use getopts::Options;
 
 const APP_NAME: &'static str = "dotfile";
-const DOT_FILE_DIR: &'static str = ".dotfiles";
+const DOT_FILE_DIR: &'static str = "dotfiles_test";
+const DOT_FILE_DIRS: [&str; 3] = ["link", "backup", "source",];
 
 struct Config<'a> {
     app_root_dir: path::PathBuf,
@@ -88,10 +89,10 @@ fn main() {
         panic!("dotfile couldn't find your home directory. \
             This probably means that $HOME was not set.");
     }
-    let root_dir_path = root_dir.unwrap();
+    let root_dir_path = root_dir.map(|dir| { dir.join(DOT_FILE_DIR) });
 
     let config = Config { 
-        app_root_dir: root_dir_path,
+        app_root_dir: root_dir_path.unwrap(),
         input: input,
     };
     
@@ -100,7 +101,17 @@ fn main() {
 
 fn initial_check(config: &Config) {
    if !config.app_root_dir.is_dir() {
-       println!("dotfile directory not exist.");
+       println!(".dotfiles directory not exist.");
+       if config.app_root_dir.is_file() {
+           println!(".dotfiles file exist.");
+           return quit();
+       }
+       fs::DirBuilder::new()
+           .create(&config.app_root_dir).unwrap();
+       println!("created .dotfiles directory");
+
+       create_mapping_file(config);
+       create_other_directory(config);
    } else if !config.app_root_dir.join("mapping.json").is_file() {
        // Scan the current dotfile directory, create mapping.json.
        // If the user prompted with yes, create the mapping.json file 
@@ -125,6 +136,12 @@ fn create_mapping_file(config: &Config) {
     println!("created mapping.json file.");
 }
 
+fn create_other_directory(config: &Config) {
+    let builder = fs::DirBuilder::new();
+    for x in &DOT_FILE_DIRS {
+        builder.create(config.app_root_dir.join(x)).unwrap();
+    }
+}
 
 fn prompt<T>(question: T) -> bool
     where T: fmt::Display {
@@ -143,4 +160,9 @@ fn prompt<T>(question: T) -> bool
     }
 
     return false;
+}
+
+fn quit() {
+    println!("quit");
+    exit(1);
 }
