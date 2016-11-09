@@ -28,7 +28,6 @@ impl<'a> fmt::Display for Config<'a> {
 }
 
 impl<'a> Config<'a> {
-
     #[allow(dead_code)]
     fn mapping_has(&self, key: &String) -> bool {
         if self.mapping.is_none() {
@@ -44,7 +43,15 @@ impl<'a> Config<'a> {
 
         try!(f.read_to_string(&mut buffer));
 
-        println!("{}", buffer);
+        let obj = json::parse(&*buffer);
+        match obj {
+           Ok(val) => {
+                println!("{}", val["name"]);
+            },
+            Err(err) => {
+                panic!(err);
+            },
+        }
 
         Ok(())
     }
