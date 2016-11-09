@@ -1,21 +1,24 @@
 extern crate getopts;
+#[macro_use]
+extern crate json;
 
 use std::process::exit;
 use std::fmt;
 use std::env;
 use std::path;
+use std::io::prelude::*;
 use std::io;
 use std::fs;
-
 use getopts::Options;
 
 const APP_NAME: &'static str = "dotfile";
 const DOT_FILE_DIR: &'static str = "dotfiles_test";
-const DOT_FILE_DIRS: [&str; 3] = ["link", "backup", "source",];
+const DOT_FILE_DIRS: [&'static str; 3] = ["link", "backup", "source",];
 
 struct Config<'a> {
     app_root_dir: path::PathBuf,
     input: &'a str,
+    mapping: Option<json::JsonValue>
 }
 
 impl<'a> fmt::Display for Config<'a> {
@@ -24,17 +27,38 @@ impl<'a> fmt::Display for Config<'a> {
     }
 }
 
-fn execute(config: &Config, out: &Vec<String>) {
+impl<'a> Config<'a> {
+
+    #[allow(dead_code)]
+    fn mapping_has(&self, key: &String) -> bool {
+        if self.mapping.is_none() {
+            panic!("mapping file not parsed");
+        }
+
+        false
+    }
+
+    fn mapping_init(&self, file: &String) -> Result<(), (io::Error)> {
+        let mut buffer = String::new();
+        let mut f = try!(fs::File::open(file));
+
+        try!(f.read_to_string(&mut buffer));
+
+        println!("{}", buffer);
+
+        Ok(())
+    }
+}
+
+fn execute(config: &mut Config, out: Option<String>) {
     initial_check(config);
 
-    let a = match config.input {
+    match config.input {
         "a" => {
-            println!("got {}", config.input);
-            config.input
+            link_add(config, out);
         },
         "r" => {
-            println!("got {}", config.input);
-            config.input
+            link_remove(config, out);
         },
         _ => {
             return;
@@ -42,9 +66,31 @@ fn execute(config: &Config, out: &Vec<String>) {
     };
 }
 
+fn link_add(config: &Config, out: Option<String>) {
+    let base_dir = config.app_root_dir.join("link/");
+    let file = out.unwrap();
+    let file_path = path::Path::new(&file);
+
+    let file_to_add = path::PathBuf::from(homedir(&file_path).unwrap());
+    if !file_to_add.exists() {
+        println!("{} not exist", file_to_add.display());
+        return quit();
+    }
+}
+
+fn link_remove(config: &Config, out: Option<String>) {
+    println!("link remove");
+}
+
 fn print_usage(program: &str, opts: Options) {
     let brief = format!("Usage: {} [options]", program);
     print!("{}", opts.usage(&brief));
+}
+
+fn homedir(file: &path::Path) -> Option<path::PathBuf> {
+    let home = env::home_dir();
+
+    home.map(|dir| { dir.join(file) })
 }
 
 fn main() {
@@ -66,20 +112,20 @@ fn main() {
         return;
     }
 
-    let output: Vec<String>;
+    let output: Option<String>;
     let input: &str;
     if matches.opt_present("a") {
         input = "a";
-        output = matches.opt_strs("a");
+        output = matches.opt_str("a");
     } else if matches.opt_present("r") {
         input = "r";
-        output = matches.opt_strs("r");
+        output = matches.opt_str("r");
     } else {
         print_usage(APP_NAME, opts);
         return;
     }
 
-    if output.is_empty() {
+    if !output.is_some() {
         print_usage(APP_NAME, opts);
         return;
     }
@@ -91,15 +137,17 @@ fn main() {
     }
     let root_dir_path = root_dir.map(|dir| { dir.join(DOT_FILE_DIR) });
 
-    let config = Config { 
+    let mut config = Config {
         app_root_dir: root_dir_path.unwrap(),
         input: input,
+        mapping: None,
     };
-    
-    execute(&config, &output);
+
+    // consume the output.
+    execute(&mut config, output);
 }
 
-fn initial_check(config: &Config) {
+fn initial_check(config: &mut Config) {
    if !config.app_root_dir.is_dir() {
        println!(".dotfiles directory not exist.");
        if config.app_root_dir.is_file() {
@@ -114,17 +162,18 @@ fn initial_check(config: &Config) {
        create_other_directory(config);
    } else if !config.app_root_dir.join("mapping.json").is_file() {
        // Scan the current dotfile directory, create mapping.json.
-       // If the user prompted with yes, create the mapping.json file 
+       // If the user prompted with yes, create the mapping.json file
        // and initialize it with current exist files.
-       // else just create a mapping.json file.
 
        if prompt("mapping.json file not exist.\n Do you want to create it from \
     current directory?") {
            create_mapping_file(config);
-       } else {
-           println!("...");
+           // TODO: init mapping.json from current directory.
        }
    }
+
+   let mapping_name = String::from(config.app_root_dir.join("mapping.json").to_str().unwrap());
+   config.mapping_init(&mapping_name).ok();
 }
 
 fn create_mapping_file(config: &Config) {
@@ -146,7 +195,7 @@ fn create_other_directory(config: &Config) {
 fn prompt<T>(question: T) -> bool
     where T: fmt::Display {
     println!("{}", question);
-    
+
     let mut input = String::new();
     match io::stdin().read_line(&mut input) {
         Ok(_) => {},
@@ -166,3 +215,4 @@ fn quit() {
     println!("quit");
     exit(1);
 }
+
