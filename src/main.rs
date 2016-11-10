@@ -29,18 +29,14 @@ impl<'a> fmt::Display for Config<'a> {
 
 impl<'a> Config<'a> {
     #[allow(dead_code)]
-    fn mapping_has(&self, key: &String) -> bool {
+    fn mapping_has(&self, key: &str) -> bool {
         if self.mapping.is_none() {
             panic!("mapping file not parsed");
         }
 
         match self.mapping {
-            Some(map) => {
-                let val = map.get(key);
-                if val.is_ok() {
-                    return true;
-                }
-                return false;
+            Some(ref map) => {
+                return !map[key].is_null();
             },
             None => {
                 return false
@@ -48,6 +44,21 @@ impl<'a> Config<'a> {
         }
 
         false
+    }
+
+    fn mapping_get(&self, key: &str) -> json::JsonValue {
+        if self.mapping.is_none() {
+            panic!("mapping file not parsed");
+        }
+
+        match self.mapping {
+            Some(ref map) => {
+                return map[key].clone();
+            },
+            None => {
+                return json::JsonValue::new_object();
+            }
+        }
     }
 
     fn mapping_init(&mut self, file: &String) -> Result<(), (io::Error)> {
