@@ -105,6 +105,12 @@ fn link_add(config: &Config, out: Option<String>) {
         println!("{} not exist", file_to_add.display());
         return quit();
     }
+
+    if is_symlink(&file_to_add) {
+        println!("{} is a symlink", file_to_add.display());
+    } else {
+        println!("not a symlink");
+    }
 }
 
 fn link_remove(config: &Config, out: Option<String>) {
@@ -118,7 +124,6 @@ fn print_usage(program: &str, opts: Options) {
 
 fn homedir(file: &path::Path) -> Option<path::PathBuf> {
     let home = env::home_dir();
-
     home.map(|dir| { dir.join(file) })
 }
 
@@ -245,3 +250,15 @@ fn quit() {
     exit(1);
 }
 
+fn is_symlink(file: &path::Path) -> bool {
+    let metadata = file.symlink_metadata();
+    match metadata {
+        Ok(meta) => {
+            return meta.file_type().is_symlink();
+        },
+        Err(err) => {
+            panic!(err);
+            // return false;
+        }
+    }
+}
