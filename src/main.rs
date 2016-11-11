@@ -103,13 +103,19 @@ fn link_add(config: &Config, out: Option<String>) {
     let file_to_add = path::PathBuf::from(homedir(&file_path).unwrap());
     if !file_to_add.exists() {
         println!("{} not exist", file_to_add.display());
-        return quit();
+        fail();
     }
 
     if is_symlink(&file_to_add) {
         println!("{} is a symlink", file_to_add.display());
-    } else {
-        println!("not a symlink");
+        fail();
+    }
+
+    if file_to_add.is_file() {
+        // copy file.
+    } else if file_to_add.is_dir() {
+        // copy dir.
+        copy_dir(&file_to_add, &base_dir).ok();
     }
 }
 
@@ -186,7 +192,7 @@ fn initial_check(config: &mut Config) {
        println!(".dotfiles directory not exist.");
        if config.app_root_dir.is_file() {
            println!(".dotfiles file exist.");
-           return quit();
+           return fail();
        }
        fs::DirBuilder::new()
            .create(&config.app_root_dir).unwrap();
@@ -245,7 +251,7 @@ fn prompt<T>(question: T) -> bool
     return false;
 }
 
-fn quit() {
+fn fail() -> ! {
     println!("quit");
     exit(1);
 }
@@ -258,7 +264,33 @@ fn is_symlink(file: &path::Path) -> bool {
         },
         Err(err) => {
             panic!(err);
-            // return false;
         }
     }
+}
+
+fn copy_file(from: &path::Path, to: &path::Path) -> Result<(), (io::Error)> {
+    try!(fs::copy(from, to));
+    Ok(())
+}
+
+fn copy_dir(from: &path::Path, to: &path::Path) -> Result<(), (io::Error)> {
+    visit_dirs(from, &move |file: &fs::DirEntry| {
+        println!("{}", file.path().display());
+    }).ok();
+    Ok(())
+}
+
+fn visit_dirs(dir: &path::Path, cb: &Fn(&fs::DirEntry)) -> Result<(), (io::Error)> {
+    if dir.is_dir() {
+        for entry in try!(fs::read_dir(dir)) {
+            let entry = try!(entry);
+            let path = entry.path();
+            if path.is_dir() {
+                try!(visit_dirs(&path, cb));
+            } else {
+                cb(&entry);
+            }
+        }
+    }
+    Ok(())
 }
