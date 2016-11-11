@@ -1,3 +1,8 @@
+///
+/// Something todo,
+/// Check the file to add, if the file is not at the home dir, give a warning.
+///
+
 extern crate getopts;
 #[macro_use]
 extern crate json;
@@ -82,25 +87,39 @@ impl<'a> Config<'a> {
 fn execute(config: &mut Config, out: Option<String>) {
     initial_check(config);
 
-    match config.input {
+    let result = match config.input {
         "a" => {
-            link_add(config, out);
+            link_add(config, out)
         },
         "r" => {
-            link_remove(config, out);
+            link_remove(config, out)
         },
         _ => {
             return;
         }
     };
+
+    if result.is_ok() {
+        println!(":-) done.");
+    }
 }
 
-fn link_add(config: &Config, out: Option<String>) {
+fn link_add(config: &Config, out: Option<String>) -> Result<(), ()> {
     let base_dir = config.app_root_dir.join("link/");
     let file = out.unwrap();
     let file_path = path::Path::new(&file);
 
-    let file_to_add = path::PathBuf::from(homedir(&file_path).unwrap());
+    let file_to_add_unresolved = path::PathBuf::from(homedir(&file_path).unwrap());
+    let file_to_add = file_to_add_unresolved.canonicalize().unwrap();
+
+    match ensure_file_under_homedir(&file_to_add) {
+        Ok(_) => {},
+        Err(_) => {
+            println!(":( you can only add file under home dir.");
+            return Err(());
+        }
+    }
+
     if !file_to_add.exists() {
         println!("{} not exist", file_to_add.display());
         fail();
@@ -115,12 +134,16 @@ fn link_add(config: &Config, out: Option<String>) {
         // copy file.
     } else if file_to_add.is_dir() {
         // copy dir.
-        copy_dir(&file_to_add, &base_dir).ok();
+        let file_move_to = base_dir.join(&file);
+        copy_dir(&file_to_add, &file_move_to).ok();
     }
+
+    Ok(())
 }
 
-fn link_remove(config: &Config, out: Option<String>) {
+fn link_remove(config: &Config, out: Option<String>) -> Result<(), ()> {
     println!("link remove");
+    Ok(())
 }
 
 fn print_usage(program: &str, opts: Options) {
@@ -292,5 +315,29 @@ fn visit_dirs(dir: &path::Path, cb: &Fn(&fs::DirEntry)) -> Result<(), (io::Error
             }
         }
     }
+    Ok(())
+}
+
+// To make sure the file is under home dir.
+fn ensure_file_under_homedir(p: &path::Path) -> Result<(), ()> {
+    let home = env::home_dir();
+    let home_dir = match home {
+        Some(p) => { p },
+        None => { panic!("{} could not access your home dir.", APP_NAME); },
+    };
+
+    let home_dir_collect: Vec<&std::ffi::OsStr> = home_dir.iter().collect();
+    let original: Vec<&std::ffi::OsStr> = p.iter().collect();
+
+    if original.len() <= home_dir_collect.len() {
+        return Err(());
+    }
+
+    for (index, item) in home_dir.iter().enumerate() {
+        if original[index] != item {
+            return Err(());
+        }
+    }
+
     Ok(())
 }
