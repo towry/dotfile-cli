@@ -16,6 +16,9 @@ use std::io;
 use std::fs;
 use getopts::Options;
 
+#[macro_use]
+mod macros;
+
 const APP_NAME: &'static str = "dotfile";
 const DOT_FILE_DIR: &'static str = "dotfiles_test";
 const DOT_FILE_DIRS: [&'static str; 3] = ["link", "backup", "source",];
@@ -110,6 +113,12 @@ fn link_add(config: &Config, out: Option<String>) -> Result<(), ()> {
     let file_path = path::Path::new(&file);
 
     let file_to_add_unresolved = path::PathBuf::from(homedir(&file_path).unwrap());
+
+    if !file_to_add_unresolved.exists() {
+        println!("{} not exist", file_to_add_unresolved.display());
+        fail();
+    }
+
     let file_to_add = file_to_add_unresolved.canonicalize().unwrap();
 
     match ensure_file_under_homedir(&file_to_add) {
@@ -118,11 +127,6 @@ fn link_add(config: &Config, out: Option<String>) -> Result<(), ()> {
             println!(":( you can only add file under home dir.");
             return Err(());
         }
-    }
-
-    if !file_to_add.exists() {
-        println!("{} not exist", file_to_add.display());
-        fail();
     }
 
     if is_symlink(&file_to_add) {
@@ -134,8 +138,11 @@ fn link_add(config: &Config, out: Option<String>) -> Result<(), ()> {
         // copy file.
     } else if file_to_add.is_dir() {
         // copy dir.
-        let file_move_to = base_dir.join(&file);
-        copy_dir(&file_to_add, &file_move_to).ok();
+        // TODO, canonicalize this.
+        // let file_move_to = base_dir.join(&file);
+        // If `file_to_add` is : a/b/c/, and base_dir is: e/f,
+        // then the result will be e/f/c/.
+        copy_dir(&file_to_add, &base_dir).ok();
     }
 
     Ok(())
@@ -292,14 +299,27 @@ fn is_symlink(file: &path::Path) -> bool {
 }
 
 fn copy_file(from: &path::Path, to: &path::Path) -> Result<(), (io::Error)> {
+    // create directory first.
+    let parent = to.parent().unwrap();
+    try!(fs::create_dir_all(parent));
+
+    debugln!("copying file");
     try!(fs::copy(from, to));
     Ok(())
 }
 
 fn copy_dir(from: &path::Path, to: &path::Path) -> Result<(), (io::Error)> {
     visit_dirs(from, &move |file: &fs::DirEntry| {
-        println!("{}", file.path().display());
+        // println!("{},   {}", file.path().display(), &to.join("abc.txt").display());
+        let to_join = path_relative(&file.path(), from);
+        match copy_file(&file.path(), &to.join(&to_join)) {
+            Ok(_) => { },
+            Err(e) => {
+                panic!(e);
+            }
+        };
     }).ok();
+
     Ok(())
 }
 
@@ -340,4 +360,9 @@ fn ensure_file_under_homedir(p: &path::Path) -> Result<(), ()> {
     }
 
     Ok(())
+}
+
+
+fn path_relative<'a>(file: &path::Path, prefix: &path::Path) -> Option<&'a path::Path> {
+    let file_arr: Vec<&std::ffi::OsStr> = file.iter().collect();
 }
