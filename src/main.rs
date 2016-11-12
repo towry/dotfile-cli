@@ -309,9 +309,12 @@ fn copy_file(from: &path::Path, to: &path::Path) -> Result<(), (io::Error)> {
 }
 
 fn copy_dir(from: &path::Path, to: &path::Path) -> Result<(), (io::Error)> {
+    let parent = from.parent().unwrap();
     visit_dirs(from, &move |file: &fs::DirEntry| {
-        // println!("{},   {}", file.path().display(), &to.join("abc.txt").display());
-        let to_join = path_relative(&file.path(), from);
+        let mut to_join_buf = path::PathBuf::new();
+        path_relative(&file.path(), &parent, &mut to_join_buf);
+        let to_join = to_join_buf.as_path();
+
         match copy_file(&file.path(), &to.join(&to_join)) {
             Ok(_) => { },
             Err(e) => {
@@ -346,23 +349,34 @@ fn ensure_file_under_homedir(p: &path::Path) -> Result<(), ()> {
         None => { panic!("{} could not access your home dir.", APP_NAME); },
     };
 
-    let home_dir_collect: Vec<&std::ffi::OsStr> = home_dir.iter().collect();
-    let original: Vec<&std::ffi::OsStr> = p.iter().collect();
-
-    if original.len() <= home_dir_collect.len() {
+    if !p.starts_with(home_dir) {
         return Err(());
     }
 
-    for (index, item) in home_dir.iter().enumerate() {
-        if original[index] != item {
-            return Err(());
-        }
-    }
+    // let home_dir_collect: Vec<&std::ffi::OsStr> = home_dir.iter().collect();
+    // let original: Vec<&std::ffi::OsStr> = p.iter().collect();
+
+    // if original.len() <= home_dir_collect.len() {
+    //     return Err(());
+    // }
+
+    // for (index, item) in home_dir.iter().enumerate() {
+    //     if original[index] != item {
+    //         return Err(());
+    //     }
+    // }
 
     Ok(())
 }
 
 
-fn path_relative<'a>(file: &path::Path, prefix: &path::Path) -> Option<&'a path::Path> {
+fn path_relative(file: &path::Path, prefix: &path::Path, buf: &mut path::PathBuf) {
     let file_arr: Vec<&std::ffi::OsStr> = file.iter().collect();
+    let prefix_arr: Vec<&std::ffi::OsStr> = prefix.iter().collect();
+
+    let relative: Vec<&std::ffi::OsStr> = file_arr[prefix_arr.len() ..].to_vec();
+
+    for item in relative {
+        buf.push(item);
+    }
 }
