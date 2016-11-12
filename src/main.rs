@@ -1,8 +1,3 @@
-///
-/// Something todo,
-/// Check the file to add, if the file is not at the home dir, give a warning.
-///
-
 extern crate getopts;
 #[macro_use]
 extern crate json;
@@ -136,6 +131,14 @@ fn link_add(config: &Config, out: Option<String>) -> Result<(), ()> {
 
     if file_to_add.is_file() {
         // copy file.
+        let mut path_buf = path::PathBuf::new();
+        let home_dir = env::home_dir();
+        if !home_dir.is_some() {
+            panic!("{} could not access your home dir.", APP_NAME);
+        }
+
+        path_relative(&file_to_add, &home_dir.unwrap(), &mut path_buf);
+        copy_file(&file_to_add, &base_dir.join(path_buf.as_path())).ok();
     } else if file_to_add.is_dir() {
         // copy dir.
         // TODO, canonicalize this.
@@ -303,7 +306,7 @@ fn copy_file(from: &path::Path, to: &path::Path) -> Result<(), (io::Error)> {
     let parent = to.parent().unwrap();
     try!(fs::create_dir_all(parent));
 
-    debugln!("copying file");
+    debugln!("copying file {} - {}", from.display(), to.display());
     try!(fs::copy(from, to));
     Ok(())
 }
@@ -352,19 +355,6 @@ fn ensure_file_under_homedir(p: &path::Path) -> Result<(), ()> {
     if !p.starts_with(home_dir) {
         return Err(());
     }
-
-    // let home_dir_collect: Vec<&std::ffi::OsStr> = home_dir.iter().collect();
-    // let original: Vec<&std::ffi::OsStr> = p.iter().collect();
-
-    // if original.len() <= home_dir_collect.len() {
-    //     return Err(());
-    // }
-
-    // for (index, item) in home_dir.iter().enumerate() {
-    //     if original[index] != item {
-    //         return Err(());
-    //     }
-    // }
 
     Ok(())
 }
