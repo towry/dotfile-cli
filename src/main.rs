@@ -5,6 +5,7 @@ use std::fmt;
 use std::env;
 use std::path;
 use std::io;
+use std::os::unix::fs::symlink;
 use std::fs;
 use getopts::Options;
 
@@ -17,6 +18,7 @@ const DOT_FILE_DIRS: [&'static str; 3] = ["link", "backup", "source",];
 
 struct Config<'a> {
     app_root_dir: path::PathBuf,
+    home_dir: path::PathBuf,
     input: &'a str,
 }
 
@@ -36,6 +38,9 @@ fn execute(config: &mut Config, out: Option<String>) {
         },
         "r" => {
             link_remove(config, out)
+        },
+        "s" => {
+            link_sync(config)
         },
         _ => {
             return;
@@ -61,7 +66,7 @@ fn link_add(config: &Config, out: Option<String>) -> Result<(), ()> {
 
     let file_to_add = file_to_add_unresolved.canonicalize().unwrap();
 
-    match ensure_file_under_homedir(&file_to_add) {
+    match ensure_file_under_homedir(config, &file_to_add) {
         Ok(_) => {},
         Err(_) => {
             println!(":( you can only add file under home dir.");
@@ -74,16 +79,17 @@ fn link_add(config: &Config, out: Option<String>) -> Result<(), ()> {
         fail();
     }
 
-    if file_to_add.is_file() {
-        // copy file.
-        let mut path_buf = path::PathBuf::new();
-        let home_dir = env::home_dir();
-        if !home_dir.is_some() {
-            panic!("{} could not access your home dir.", APP_NAME);
-        }
+    // copy file.
+    let mut path_buf = path::PathBuf::new();
+    path_relative(&file_to_add, &config.home_dir, &mut path_buf);
 
-        path_relative(&file_to_add, &home_dir.unwrap(), &mut path_buf);
+    debugln!("backup_file: {}", file_to_add.display());
+    backup_file(config, &file_to_add).ok();
+
+    if file_to_add.is_file() {
         copy_file(&file_to_add, &base_dir.join(path_buf.as_path())).ok();
+        // remove file
+        fs::remove_file(&file_to_add).ok();
     } else if file_to_add.is_dir() {
         // copy dir.
         // TODO, canonicalize this.
@@ -91,13 +97,38 @@ fn link_add(config: &Config, out: Option<String>) -> Result<(), ()> {
         // If `file_to_add` is : a/b/c/, and base_dir is: e/f,
         // then the result will be e/f/c/.
         copy_dir(&file_to_add, &base_dir).ok();
+        // remove directory
+        fs::remove_dir_all(&file_to_add).ok();
     }
+
+    // Create symlink.
+    debugln!("create symlink");
+    symlink(&base_dir.join(path_buf.as_path()), &file_to_add).ok();
 
     Ok(())
 }
 
 fn link_remove(config: &Config, out: Option<String>) -> Result<(), ()> {
     println!("link remove");
+    Ok(())
+}
+
+fn link_sync(config: &Config) -> Result<(), ()> {
+    Ok(())
+}
+
+fn backup_file(config: &Config, file: &path::Path) -> Result<(), ()> {
+    let base_dir = config.app_root_dir.join("backup/");
+    let home_dir = &config.home_dir;
+    let mut path_buf = path::PathBuf::new();
+    path_relative(&file, home_dir, &mut path_buf);
+
+    if file.is_file() {
+        copy_file(&file, &base_dir.join(path_buf.as_path())).ok();
+    } else if file.is_dir() {
+        copy_dir(&file, &base_dir).ok();
+    }
+
     Ok(())
 }
 
@@ -118,6 +149,7 @@ fn main() {
 
     opts.optopt("a", "add", "add file to manage list", "FILE");
     opts.optopt("r", "remove", "remove file from manage list", "FILE");
+    opts.optflag("s", "sync", "sync dotfiles");
     opts.optflag("h", "help", "print this help menu");
 
     let matches = match opts.parse(&args[1..]) {
@@ -138,6 +170,9 @@ fn main() {
     } else if matches.opt_present("r") {
         input = "r";
         output = matches.opt_str("r");
+    } else if matches.opt_present("s") {
+        input = "s";
+        output = matches.opt_str("s");
     } else {
         print_usage(APP_NAME, opts);
         return;
@@ -153,10 +188,12 @@ fn main() {
         panic!("dotfile couldn't find your home directory. \
             This probably means that $HOME was not set.");
     }
+    let home_dir = root_dir.clone();
     let root_dir_path = root_dir.map(|dir| { dir.join(DOT_FILE_DIR) });
 
     let mut config = Config {
         app_root_dir: root_dir_path.unwrap(),
+        home_dir: home_dir.unwrap(),
         input: input,
     };
 
@@ -186,6 +223,7 @@ fn create_other_directory(config: &Config) {
     }
 }
 
+#[allow(dead_code)]
 fn prompt<T>(question: T) -> bool
     where T: fmt::Display {
     println!("{}", question);
@@ -266,12 +304,13 @@ fn visit_dirs(dir: &path::Path, cb: &Fn(&fs::DirEntry)) -> Result<(), (io::Error
 }
 
 // To make sure the file is under home dir.
-fn ensure_file_under_homedir(p: &path::Path) -> Result<(), ()> {
-    let home = env::home_dir();
-    let home_dir = match home {
-        Some(p) => { p },
-        None => { panic!("{} could not access your home dir.", APP_NAME); },
-    };
+fn ensure_file_under_homedir(config: &Config, p: &path::Path) -> Result<(), ()> {
+    // let home = env::home_dir();
+    // let home_dir = match home {
+    //     Some(p) => { p },
+    //     None => { panic!("{} could not access your home dir.", APP_NAME); },
+    // };
+    let home_dir = &config.home_dir;
 
     if !p.starts_with(home_dir) {
         return Err(());
