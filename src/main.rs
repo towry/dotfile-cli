@@ -13,7 +13,12 @@ use getopts::Options;
 mod macros;
 
 const APP_NAME: &'static str = "dotfile";
+
+#[cfg(feature = "debug")]
 const DOT_FILE_DIR: &'static str = "dotfiles_test";
+#[cfg(not(feature = "debug"))]
+const DOT_FILE_DIR: &'static str = ".dotfiles";
+
 const DOT_FILE_DIRS: [&'static str; 3] = ["link", "backup", "source",];
 const dry_run: bool = false;
 
@@ -28,7 +33,6 @@ impl<'a> fmt::Display for Config<'a> {
         write!(f, "{}", self.app_root_dir.display())
     }
 }
-
 
 fn execute(config: &mut Config, out: Option<String>) {
     initial_check(config);

@@ -18,6 +18,18 @@ A simple cli tool to manage dotfiles.
 
 
 
+## Install
+
+```
+git clone https://github.com/towry/dotfile-cli.git
+cd dotfile-cli
+make release && make install
+```
+
+__or__ you can download the binary file in the releases page.
+
+
+
 #### TODO
 
 - link_remove
