@@ -139,16 +139,22 @@ fn link_sync(config: &Config) -> Result<(), ()> {
 
         let file_copy_to = homedir.join(&to_join);
 
-        debugln!("backup file {}", &file_copy_to.display());
-        backup_file(config, &file_copy_to).ok();
-
         // do not override the symlink.
         if is_symlink(&file_copy_to) {
+            println!("{} is symlink, pass", &file_copy_to.display());
             return;
         }
 
+        if file_copy_to.exists() {
+            println!("{} exists, pass", file_copy_to.display());
+            return;
+        }
+
+        debugln!("backup file {}", &file_copy_to.display());
+        backup_file(config, &file_copy_to).ok();
+
         if file_copy_to.is_file() {
-            copy_file(&file.path(), &homedir.join(&to_join)).ok();
+            copy_file(&file.path(), &file_copy_to).ok();
         } else if file_copy_to.is_dir() {
             copy_dir(&file.path(), &file_copy_to).ok();
         }
@@ -330,6 +336,7 @@ fn copy_dir(from: &path::Path, to: &path::Path) -> Result<(), (io::Error)> {
         path_relative(&file.path(), &parent, &mut to_join_buf);
         let to_join = to_join_buf.as_path();
 
+        println!("copy file {} - {}",&file.path().display(), &to.join(&to_join).display());
         match copy_file(&file.path(), &to.join(&to_join)) {
             Ok(_) => { },
             Err(e) => {
