@@ -15,7 +15,7 @@ mod macros;
 const APP_NAME: &'static str = "dotfile";
 const DOT_FILE_DIR: &'static str = "dotfiles_test";
 const DOT_FILE_DIRS: [&'static str; 3] = ["link", "backup", "source",];
-const dry_run: bool = true;
+const dry_run: bool = false;
 
 struct Config<'a> {
     app_root_dir: path::PathBuf,
@@ -125,14 +125,39 @@ fn link_remove(config: &Config, out: Option<String>) -> Result<(), ()> {
 
 // It will sync the files in .dotfiles dir.
 fn link_sync(config: &Config) -> Result<(), ()> {
-    let base_dir = config.app_root_dir.join("link/");
+    let base_dir = &config.app_root_dir.join("link/");
+    let homedir = &config.home_dir;
     visit_dirs(&base_dir, &move |file: &fs::DirEntry| {
+        let mut to_join_buf = path::PathBuf::new();
+        path_relative(&file.path(), &base_dir, &mut to_join_buf);
+        let to_join = to_join_buf.as_path();
+        debugln!("to join {}", to_join.display());
+
+        let file_copy_to = homedir.join(&to_join);
+
+        debugln!("backup file {}", &file_copy_to.display());
+        backup_file(config, &file_copy_to).ok();
+
+        // do not override the symlink.
+        if is_symlink(&file_copy_to) {
+            return;
+        }
+
+        if file_copy_to.is_file() {
+            copy_file(&file.path(), &homedir.join(&to_join)).ok();
+        } else if file_copy_to.is_dir() {
+            copy_dir(&file.path(), &file_copy_to).ok();
+        }
         
-    }).ok();
+    }, false).ok();
     Ok(())
 }
 
 fn backup_file(config: &Config, file: &path::Path) -> Result<(), ()> {
+    if !file.exists() {
+        return Ok(());
+    }
+
     let base_dir = config.app_root_dir.join("backup/");
     let home_dir = &config.home_dir;
     let mut path_buf = path::PathBuf::new();
@@ -274,8 +299,8 @@ fn is_symlink(file: &path::Path) -> bool {
         Ok(meta) => {
             return meta.file_type().is_symlink();
         },
-        Err(err) => {
-            panic!(err);
+        Err(_) => {
+            return false;
         }
     }
 }
@@ -307,18 +332,22 @@ fn copy_dir(from: &path::Path, to: &path::Path) -> Result<(), (io::Error)> {
                 panic!(e);
             }
         };
-    }).ok();
+    }, true).ok();
 
     Ok(())
 }
 
-fn visit_dirs(dir: &path::Path, cb: &Fn(&fs::DirEntry)) -> Result<(), (io::Error)> {
+fn visit_dirs(dir: &path::Path, cb: &Fn(&fs::DirEntry), deep: bool) -> Result<(), (io::Error)> {
     if dir.is_dir() {
         for entry in try!(fs::read_dir(dir)) {
             let entry = try!(entry);
             let path = entry.path();
             if path.is_dir() {
-                try!(visit_dirs(&path, cb));
+                if deep {
+                    try!(visit_dirs(&path, cb, deep));
+                } else {
+                    cb(&entry);
+                }
             } else {
                 cb(&entry);
             }
