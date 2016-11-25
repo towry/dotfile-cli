@@ -336,11 +336,15 @@ fn ensure_file_under_homedir(config: &Config, p: &path::Path) -> Result<(), ()> 
     // };
     let home_dir = &config.home_dir;
 
+    debugln!("ensure file({}) under homedir({})", p.display(), home_dir.display());
+
     if !p.starts_with(home_dir) {
         return Err(());
     }
 
-    debugln!("ensure file({}) under homedir({})", p.display(), home_dir.display());
+    if p == home_dir {
+        return Err(());
+    }
 
     Ok(())
 }
