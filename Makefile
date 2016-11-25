@@ -7,4 +7,4 @@ debug:
 release:
 	cargo build --release
 
-.PHONY: debug
+.PHONY: debug release

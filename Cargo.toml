@@ -8,7 +8,6 @@ name = "dotfile"
 
 [dependencies]
 getopts = "0.2"
-json = "*"
 
 [features]
 debug = []

@@ -58,9 +58,15 @@ fn link_add(config: &Config, out: Option<String>) -> Result<(), ()> {
     let file_path = path::Path::new(&file);
 
     let file_to_add_unresolved = path::PathBuf::from(homedir(&file_path).unwrap());
+    debugln!("file to add unresolved {}", file_to_add_unresolved.display());
 
     if !file_to_add_unresolved.exists() {
         println!("{} not exist", file_to_add_unresolved.display());
+        fail();
+    }
+
+    if is_symlink(&file_to_add_unresolved) {
+        println!("{} is a symlink", file_to_add_unresolved.display());
         fail();
     }
 
@@ -72,11 +78,6 @@ fn link_add(config: &Config, out: Option<String>) -> Result<(), ()> {
             println!(":( you can only add file under home dir.");
             return Err(());
         }
-    }
-
-    if is_symlink(&file_to_add) {
-        println!("{} is a symlink", file_to_add.display());
-        fail();
     }
 
     // copy file.
@@ -113,7 +114,12 @@ fn link_remove(config: &Config, out: Option<String>) -> Result<(), ()> {
     Ok(())
 }
 
+// It will sync the files in .dotfiles dir.
 fn link_sync(config: &Config) -> Result<(), ()> {
+    let base_dir = config.app_root_dir.join("link/");
+    visit_dirs(&base_dir, &move |file: &fs::DirEntry| {
+        
+    }).ok();
     Ok(())
 }
 
@@ -172,7 +178,7 @@ fn main() {
         output = matches.opt_str("r");
     } else if matches.opt_present("s") {
         input = "s";
-        output = matches.opt_str("s");
+        output = Some(String::from(""));
     } else {
         print_usage(APP_NAME, opts);
         return;
@@ -249,6 +255,7 @@ fn fail() -> ! {
 }
 
 fn is_symlink(file: &path::Path) -> bool {
+    debugln!("test is symlink: {}", file.display());
     let metadata = file.symlink_metadata();
     match metadata {
         Ok(meta) => {
