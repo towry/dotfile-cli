@@ -15,6 +15,7 @@ mod macros;
 const APP_NAME: &'static str = "dotfile";
 const DOT_FILE_DIR: &'static str = "dotfiles_test";
 const DOT_FILE_DIRS: [&'static str; 3] = ["link", "backup", "source",];
+const dry_run: bool = true;
 
 struct Config<'a> {
     app_root_dir: path::PathBuf,
@@ -84,14 +85,18 @@ fn link_add(config: &Config, out: Option<String>) -> Result<(), ()> {
     let mut path_buf = path::PathBuf::new();
     path_relative(&file_to_add, &config.home_dir, &mut path_buf);
 
-    debugln!("backup_file: {}", file_to_add.display());
+    debugln!("backup file {}", file_to_add.display());
     backup_file(config, &file_to_add).ok();
 
     if file_to_add.is_file() {
+        debugln!("file to add is a file");
         copy_file(&file_to_add, &base_dir.join(path_buf.as_path())).ok();
         // remove file
-        fs::remove_file(&file_to_add).ok();
+        if !dry_run {
+            fs::remove_file(&file_to_add).ok();
+        }
     } else if file_to_add.is_dir() {
+        debugln!("file to add is a directory");
         // copy dir.
         // TODO, canonicalize this.
         // let file_move_to = base_dir.join(&file);
@@ -99,12 +104,16 @@ fn link_add(config: &Config, out: Option<String>) -> Result<(), ()> {
         // then the result will be e/f/c/.
         copy_dir(&file_to_add, &base_dir).ok();
         // remove directory
-        fs::remove_dir_all(&file_to_add).ok();
+        if !dry_run {
+            fs::remove_dir_all(&file_to_add).ok();
+        }
     }
 
     // Create symlink.
     debugln!("create symlink");
-    symlink(&base_dir.join(path_buf.as_path()), &file_to_add).ok();
+    if !dry_run {
+        symlink(&base_dir.join(path_buf.as_path()), &file_to_add).ok();
+    }
 
     Ok(())
 }
@@ -225,7 +234,11 @@ fn initial_check(config: &mut Config) {
 fn create_other_directory(config: &Config) {
     let builder = fs::DirBuilder::new();
     for x in &DOT_FILE_DIRS {
-        builder.create(config.app_root_dir.join(x)).unwrap();
+        if !dry_run {
+            builder.create(config.app_root_dir.join(x)).unwrap();
+        } else {
+            println!("create directory {}", config.app_root_dir.join(x).display());
+        }
     }
 }
 
@@ -255,7 +268,7 @@ fn fail() -> ! {
 }
 
 fn is_symlink(file: &path::Path) -> bool {
-    debugln!("test is symlink: {}", file.display());
+    debugln!("test if it is symlink: {}", file.display());
     let metadata = file.symlink_metadata();
     match metadata {
         Ok(meta) => {
@@ -270,10 +283,14 @@ fn is_symlink(file: &path::Path) -> bool {
 fn copy_file(from: &path::Path, to: &path::Path) -> Result<(), (io::Error)> {
     // create directory first.
     let parent = to.parent().unwrap();
-    try!(fs::create_dir_all(parent));
+    if !dry_run {
+        try!(fs::create_dir_all(parent));
+    }
 
     debugln!("copying file {} - {}", from.display(), to.display());
-    try!(fs::copy(from, to));
+    if !dry_run {
+        try!(fs::copy(from, to));
+    }
     Ok(())
 }
 
@@ -322,6 +339,8 @@ fn ensure_file_under_homedir(config: &Config, p: &path::Path) -> Result<(), ()> 
     if !p.starts_with(home_dir) {
         return Err(());
     }
+
+    debugln!("ensure file({}) under homedir({})", p.display(), home_dir.display());
 
     Ok(())
 }
