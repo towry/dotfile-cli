@@ -32,7 +32,7 @@ __or__ you can download the binary file in the releases page.
 
 #### TODO
 
-- link_remove
+- ~~link_remove~~
 - ~~link_sync~~
 
 ---

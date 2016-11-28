@@ -123,7 +123,35 @@ fn link_add(config: &Config, out: Option<String>) -> Result<(), ()> {
 }
 
 fn link_remove(config: &Config, out: Option<String>) -> Result<(), ()> {
-    println!("link remove");
+    let base_dir = &config.app_root_dir.join("link/");
+    let homedir = &config.home_dir;
+    let file = out.unwrap();
+    let file_to_remove = base_dir.join(&file);
+    let file_move_to = homedir.join(&file);
+
+    if !file_to_remove.exists() {
+        println!("file {} not exists", file_to_remove.display());
+        return Ok(());
+    }
+
+    if file_move_to.exists() {
+        println!("file already exists {}", file_move_to.display());
+        return Ok(());
+    }
+
+    if file_to_remove.is_file() {
+        copy_file(&file_to_remove, &file_move_to).ok();
+        // delete file.
+        if !dry_run {
+            fs::remove_file(&file_to_remove).ok();
+        }
+    } else if file_to_remove.is_dir() {
+        copy_dir(&file_to_remove, &file_move_to).ok();
+        if !dry_run {
+            fs::remove_dir_all(&file_to_remove).ok();
+        }
+    }
+
     Ok(())
 }
 
@@ -150,15 +178,24 @@ fn link_sync(config: &Config) -> Result<(), ()> {
             return;
         }
 
-        debugln!("backup file {}", &file_copy_to.display());
-        backup_file(config, &file_copy_to).ok();
+        // debugln!("backup file {}", &file_copy_to.display());
+        // backup_file(config, &file_copy_to).ok();
 
-        if file_copy_to.is_file() {
-            copy_file(&file.path(), &file_copy_to).ok();
-        } else if file_copy_to.is_dir() {
-            copy_dir(&file.path(), &file_copy_to).ok();
+        // if file_copy_to.is_file() {
+        //     copy_file(&file.path(), &file_copy_to).ok();
+        // } else if file_copy_to.is_dir() {
+        //     copy_dir(&file.path(), &file_copy_to).ok();
+        // }
+
+        // Create symlink.
+        debugln!("create symlink");
+        if !dry_run {
+            symlink(&file.path(), &file_copy_to).ok();
+        } else {
+            println!("create symlink {} => {}", &file.path().display(),
+                &file_copy_to.display());
         }
-        
+
     }, false).ok();
     Ok(())
 }
