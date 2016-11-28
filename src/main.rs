@@ -102,7 +102,6 @@ fn link_add(config: &Config, out: Option<String>) -> Result<(), ()> {
     } else if file_to_add.is_dir() {
         debugln!("file to add is a directory");
         // copy dir.
-        // TODO, canonicalize this.
         // let file_move_to = base_dir.join(&file);
         // If `file_to_add` is : a/b/c/, and base_dir is: e/f,
         // then the result will be e/f/c/.
@@ -177,15 +176,6 @@ fn link_sync(config: &Config) -> Result<(), ()> {
             println!("{} exists, pass", file_copy_to.display());
             return;
         }
-
-        // debugln!("backup file {}", &file_copy_to.display());
-        // backup_file(config, &file_copy_to).ok();
-
-        // if file_copy_to.is_file() {
-        //     copy_file(&file.path(), &file_copy_to).ok();
-        // } else if file_copy_to.is_dir() {
-        //     copy_dir(&file.path(), &file_copy_to).ok();
-        // }
 
         // Create symlink.
         debugln!("create symlink");
@@ -406,11 +396,6 @@ fn visit_dirs(dir: &path::Path, cb: &Fn(&fs::DirEntry), deep: bool) -> Result<()
 
 // To make sure the file is under home dir.
 fn ensure_file_under_homedir(config: &Config, p: &path::Path) -> Result<(), ()> {
-    // let home = env::home_dir();
-    // let home_dir = match home {
-    //     Some(p) => { p },
-    //     None => { panic!("{} could not access your home dir.", APP_NAME); },
-    // };
     let home_dir = &config.home_dir;
 
     debugln!("ensure file({}) under homedir({})", p.display(), home_dir.display());
