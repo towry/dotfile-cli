@@ -1,5 +1,5 @@
 
-# dotfile {W.I.P}
+# dotfile
 
 A simple cli tool to manage dotfiles.
 

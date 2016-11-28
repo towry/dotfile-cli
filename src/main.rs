@@ -134,7 +134,7 @@ fn link_remove(config: &Config, out: Option<String>) -> Result<(), ()> {
         return Ok(());
     }
 
-    if file_move_to.exists() {
+    if file_move_to.exists() && !is_symlink(&file_move_to) {
         println!("file already exists {}", file_move_to.display());
         return Ok(());
     }
